@@ -1,0 +1,3 @@
+script:
+  release: goreleaser release --snapshot --clean
+  build: cd ./cli && go build -o ../aliax.exe .

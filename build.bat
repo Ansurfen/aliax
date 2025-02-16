@@ -1,3 +1,3 @@
 @echo off
-cd cli
-go build -o ../aliax.exe .
+go env -w GOOS=windows
+go run ./cli/main.go build

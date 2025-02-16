@@ -16,7 +16,12 @@ import (
 
 var (
 	cleanCmd = &cobra.Command{
-		Use: "clean",
+		Use:   "clean",
+		Short: "Remove generated scripts and clean up workspace",
+		Long: `The "clean" command removes all auto-generated scripts from the workspace.
+It scans the "run-scripts" directory and deletes scripts (e.g. .ps1, .sh).
+Additionally, it ensures that outdated extended commands are cleared.`,
+		Example: "  aliax clean",
 		Run: func(cmd *cobra.Command, args []string) {
 			data, err := os.ReadFile(config)
 			if err != nil {

@@ -8,7 +8,11 @@ import (
 	"aliax/internal/cfg"
 	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
+	"strings"
 
+	"github.com/google/shlex"
 	"gopkg.in/yaml.v3"
 )
 
@@ -19,7 +23,7 @@ func main() {
 			subCmd[sub.Use] = struct{}{}
 		}
 		if _, ok := subCmd[os.Args[1]]; !ok {
-			data, err := os.ReadFile("aliax.yaml")
+			data, err := os.ReadFile(cfg.Name())
 			if err != nil {
 				panic(err)
 			}
@@ -29,11 +33,39 @@ func main() {
 				panic(err)
 			}
 			if script, ok := file.Script[os.Args[1]]; ok {
-				fmt.Println(script)
+				if err = ExecuteCommand(script); err != nil {
+					panic(err)
+				}
 				return
 			}
 		}
 	}
 
 	cmd.Execute()
+}
+
+func ExecuteCommand(cmdStr string) error {
+	parts, err := shlex.Split(cmdStr)
+	if err != nil {
+		return fmt.Errorf("error splitting command: %v", err)
+	}
+
+	isWindows := runtime.GOOS == "windows"
+
+	var cmdExec *exec.Cmd
+
+	if isWindows {
+		cmdExec = exec.Command("cmd", "/C", strings.Join(parts, " "))
+	} else {
+		cmdExec = exec.Command("bash", "-c", strings.Join(parts, " "))
+	}
+
+	cmdExec.Stdout = os.Stdout
+	cmdExec.Stderr = os.Stderr
+
+	if err := cmdExec.Run(); err != nil {
+		return fmt.Errorf("error executing command: %v", err)
+	}
+
+	return nil
 }

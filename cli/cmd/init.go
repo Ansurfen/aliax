@@ -32,7 +32,12 @@ type initCmdParameter struct {
 var (
 	initParameter initCmdParameter
 	initCmd       = &cobra.Command{
-		Use: "init",
+		Use:   "init",
+		Short: "Initialize the aliax workspace and generate execution scripts",
+		Long: `The "init" command scans the aliax configuration file and generates necessary execution scripts.
+It creates platform-specific scripts in the "run-scripts" directory for alias commands and extensions.
+If the --global (-g) flag is set, it applies configurations globally.`,
+		Example: "  aliax init\n  aliax init --global",
 		Run: func(cmd *cobra.Command, args []string) {
 			data, err := os.ReadFile(config)
 			if err != nil {
@@ -151,7 +156,7 @@ var (
 				bashast.Print(shNode, shFile)
 				shFile.Close()
 
-				// ln -s 
+				// ln -s
 			}
 
 			if initParameter.global {
@@ -165,7 +170,7 @@ var (
 
 func init() {
 	aliaxCmd.AddCommand(initCmd)
-	initCmd.PersistentFlags().BoolVarP(&initParameter.global, "global", "g", false, "")
+	initCmd.PersistentFlags().BoolVarP(&initParameter.global, "global", "g", false, "Apply the initialization globally, affecting the entire system instead of the current project")
 }
 
 //go:embed setG.sh setG.vbs
