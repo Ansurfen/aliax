@@ -24,6 +24,7 @@ builds:
       - windows
       - darwin
     binary: aliax
+    ldflags: "-X 'aliax/cli/cmd.Version={{ .Version }}'"
 
 archives:
   - format: tar.gz

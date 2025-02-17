@@ -10,6 +10,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version will be set by the build process using -ldflags.
+// Do not modify this variable directly. It is populated at build time with the desired version string.
+var Version = ""
+
 var (
 	config   = cfg.Name()
 	aliaxCmd = &cobra.Command{

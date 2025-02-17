@@ -5,13 +5,14 @@ package cmd
 
 import (
 	"aliax/internal/cfg"
+	"aliax/internal/io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/caarlos0/log"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -23,35 +24,58 @@ It scans the "run-scripts" directory and deletes scripts (e.g. .ps1, .sh).
 Additionally, it ensures that outdated extended commands are cleared.`,
 		Example: "  aliax clean",
 		Run: func(cmd *cobra.Command, args []string) {
-			data, err := os.ReadFile(config)
-			if err != nil {
-				panic(err)
-			}
 			var file cfg.Aliax
-			err = yaml.Unmarshal(data, &file)
+			err := io.ReadYAML(config, &file)
 			if err != nil {
-				panic(err)
+				log.WithError(err).Fatalf("parsing %s", config)
 			}
+			log.Infof("parsing %s", config)
 			bins := map[string]struct{}{}
 			for name := range file.Extend {
 				bins[name] = struct{}{}
 			}
+			log.Info("cleaning")
+			log.IncreasePadding()
 			err = filepath.Walk("run-scripts", func(path string, info fs.FileInfo, err error) error {
 				if err != nil {
 					return err
 				}
 				if strings.HasSuffix(filepath.Base(path), ".ps1") {
-					os.Remove(path)
+					err = os.Remove(path)
+					if err != nil {
+						log.WithError(err).Errorf("removing %s", path)
+						return err
+					} else {
+						log.Infof("removing %s", path)
+					}
 				}
 
 				if strings.HasSuffix(filepath.Base(path), ".sh") {
-					os.Remove(path)
+					err = os.Remove(path)
+					if err != nil {
+						log.WithError(err).Errorf("removing %s", path)
+						return err
+					} else {
+						log.Infof("removing %s", path)
+					}
+				}
+
+				if filepath.Base(filepath.Dir(path)) == "bash" {
+					err = os.Remove(path)
+					if err != nil {
+						log.WithError(err).Errorf("removing %s", path)
+						return err
+					} else {
+						log.Infof("removing %s", path)
+					}
 				}
 				return nil
 			})
+			log.DecreasePadding()
 			if err != nil {
-				panic(err)
+				log.WithError(err).Fatal("walk run-scripts")
 			}
+			log.Info("thanks for using aliax!")
 		},
 	}
 )

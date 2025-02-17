@@ -7,9 +7,12 @@ import (
 	bashast "aliax/internal/ast/bash"
 	psast "aliax/internal/ast/powershell"
 	"aliax/internal/cfg"
+	"aliax/internal/io"
+	"aliax/internal/shell"
 	bashtoken "aliax/internal/token/bash"
 	token "aliax/internal/token/powershell"
-	"embed"
+	"errors"
+	"path/filepath"
 	"runtime"
 
 	"fmt"
@@ -20,9 +23,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ansurfen/globalenv"
+	"github.com/caarlos0/log"
 	"github.com/spf13/cobra"
-
-	"gopkg.in/yaml.v3"
 )
 
 type initCmdParameter struct {
@@ -39,22 +42,27 @@ It creates platform-specific scripts in the "run-scripts" directory for alias co
 If the --global (-g) flag is set, it applies configurations globally.`,
 		Example: "  aliax init\n  aliax init --global",
 		Run: func(cmd *cobra.Command, args []string) {
-			data, err := os.ReadFile(config)
-			if err != nil {
-				panic(err)
-			}
 			var file cfg.Aliax
-			err = yaml.Unmarshal(data, &file)
+			err := io.ReadYAML(config, &file)
 			if err != nil {
-				panic(err)
+				log.WithError(err).Fatalf("parsing %s", config)
 			}
-			os.Mkdir("run-scripts", 0755)
+			log.Infof("parsing %s", config)
+			err = os.MkdirAll("run-scripts/bash", 0755)
+			if err != nil {
+				if errors.Is(err, os.ErrExist) {
+					log.WithError(err).Warn("making run-scripts directory")
+				} else {
+					log.WithError(err).Fatal("making run-scripts directory")
+				}
+			}
+			bins := map[string]string{}
 			for name, cmd := range file.Extend {
 				var bin string
 				if len(cmd.Bin) == 0 {
 					bin, err = exec.LookPath(name)
 					if err != nil {
-						panic(err)
+						log.WithError(err).Fatal("looking path")
 					}
 					cmd.Bin = bin
 				} else {
@@ -66,10 +74,13 @@ If the --global (-g) flag is set, it applies configurations globally.`,
 						return s
 					})
 				}
-
-				psFile, err := os.Create(fmt.Sprintf("./run-scripts/%s.ps1", name))
+				bins[name] = bin
+				filename := fmt.Sprintf("./run-scripts/%s.ps1", name)
+				psFile, err := os.Create(filename)
 				if err != nil {
-					panic(err)
+					log.WithError(err).Fatalf("creating %s", filename)
+				} else {
+					log.Infof("creating %s", filename)
 				}
 				psNode := &psast.File{}
 				psNode.Stmts = append(psNode.Stmts, &psast.Comment{
@@ -98,9 +109,12 @@ If the --global (-g) flag is set, it applies configurations globally.`,
 					return s
 				})
 
-				shFile, err := os.Create(fmt.Sprintf("./run-scripts/%s.sh", name))
+				filename = fmt.Sprintf("./run-scripts/%s.sh", name)
+				shFile, err := os.Create(filename)
 				if err != nil {
-					panic(err)
+					log.WithError(err).Fatalf("creating %s", filename)
+				} else {
+					log.Infof("creating %s", filename)
 				}
 				shNode := &bashast.File{}
 				shNode.Stmts = append(shNode.Stmts, &bashast.Comment{
@@ -122,6 +136,21 @@ If the --global (-g) flag is set, it applies configurations globally.`,
 				})
 				bashast.Print(shNode, shFile)
 				shFile.Close()
+
+				target, err := filepath.Abs(shFile.Name())
+				if err != nil {
+					log.WithError(err).Fatal("invalid path")
+				}
+				link := filepath.Join(filepath.Dir(target), "bash", strings.TrimSuffix(filepath.Base(target), ".sh"))
+
+				if runtime.GOOS == "windows" {
+					err = shell.Run("cmd", "/C", "mklink", link, target)
+				} else {
+					err = shell.Run("ln", "-s", target, link)
+				}
+				if err != nil {
+					log.Fatalf("creating symbol link for %s", target)
+				}
 			}
 
 			for name, cmd := range file.Command {
@@ -156,14 +185,41 @@ If the --global (-g) flag is set, it applies configurations globally.`,
 				bashast.Print(shNode, shFile)
 				shFile.Close()
 
-				// ln -s
+				target, err := filepath.Abs(shFile.Name())
+				if err != nil {
+					log.WithError(err).Fatal("invalid path")
+				}
+				link := filepath.Join(filepath.Dir(target), "bash", strings.TrimSuffix(filepath.Base(target), ".sh"))
+
+				if runtime.GOOS == "windows" {
+					err = shell.Run("cmd", "/C", "mklink", link, target)
+				} else {
+					err = shell.Run("ln", "-s", target, link)
+				}
+				if err != nil {
+					log.Fatalf("creating symbol link for %s", target)
+				}
 			}
 
 			if initParameter.global {
 				if err = setGlobal(); err != nil {
-					panic(err)
+					log.WithError(err).Fatal("setting for the global")
+				} else {
+					data, err := getAliaxPath()
+					if err != nil && !errors.Is(err, errAliaxPathNotFound) {
+						log.WithError(err).Fatal("setting environment")
+					}
+					for k, v := range bins {
+						data[k] = v
+					}
+					output, err := setAliaxPath(data)
+					if err != nil {
+						log.WithField("output", string(output)).WithError(err).Fatal("setting environment")
+					}
+					log.Info("setting for the global")
 				}
 			}
+			log.Info("thanks for using aliax!")
 		},
 	}
 )
@@ -173,9 +229,6 @@ func init() {
 	initCmd.PersistentFlags().BoolVarP(&initParameter.global, "global", "g", false, "Apply the initialization globally, affecting the entire system instead of the current project")
 }
 
-//go:embed setG.sh setG.vbs
-var setG embed.FS
-
 var (
 	namedArguments = regexp.MustCompile(`\{\{\s*\.(\w+)\s*\}\}`)
 	indexArguments = regexp.MustCompile(`\{\{\s*\$(\d+)\s*\}\}`)
@@ -183,37 +236,36 @@ var (
 )
 
 func setGlobal() error {
-	suffix := "sh"
+	var (
+		value string
+		err   error
+	)
 	if runtime.GOOS == "windows" {
-		suffix = "vbs"
-	}
-	tmpFile, err := os.CreateTemp(".", fmt.Sprintf("embedded_script_*.%s", suffix))
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmpFile.Name())
-
-	data, err := setG.ReadFile(fmt.Sprintf("setG.%s", suffix))
-	if err != nil {
-		return err
-	}
-	_, err = tmpFile.Write(data)
-	if err != nil {
-		return err
-	}
-	tmpFile.Close()
-
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("wscript", tmpFile.Name())
+		value, err = globalenv.Get("Path")
 	} else {
-		cmd = exec.Command("bash", tmpFile.Name())
+		value, err = globalenv.Get("PATH")
 	}
-	err = cmd.Run()
 	if err != nil {
 		return err
 	}
-
+	path, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	path = filepath.Join(path, "run-scripts")
+	if !strings.Contains(value, path) {
+		var output []byte
+		if runtime.GOOS == "windows" {
+			output, err = globalenv.Set("Path", fmt.Sprintf("%s;%s", path, value))
+		} else {
+			output, err = globalenv.Set("PATH", fmt.Sprintf("$PATH:%s", path))
+		}
+		if err != nil {
+			log.WithField("output", string(output)).Error("setting Path")
+			return err
+		}
+	}
+	log.WithField("path", path).Warn("the environment variable is already set")
 	return nil
 }
 
@@ -285,6 +337,9 @@ func psBlockStmtBuild(subCommand []psast.Stmt, ident string, cmd cfg.Command) (b
 				alias = append(alias, flag.Name)
 			} else {
 				alias = append(alias, flag.Alias...)
+			}
+			for i, a := range alias {
+				alias[i] = regexp.QuoteMeta(a)
 			}
 			rule := strings.Join(alias, "|")
 			caseStmt := &psast.CaseStmt{
@@ -492,6 +547,9 @@ func bashBlockStmtBuild(subCommand []bashast.Stmt, ident string, cmd cfg.Command
 				alias = append(alias, flag.Name)
 			} else {
 				alias = append(alias, flag.Alias...)
+			}
+			for i, a := range alias {
+				alias[i] = regexp.QuoteMeta(a)
 			}
 			rule := strings.Join(alias, "|")
 			caseStmt := &bashast.CaseStmt{

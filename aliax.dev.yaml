@@ -1,3 +1,17 @@
+extend:
+  git:
+    command:
+      acp:
+        flags:
+          - name: message
+            alias: [-m, --message]
+            type: string
+        match:
+          - pattern: message
+            run: |
+              git add .
+              docwiz commit -m "{{.message}}" -e
+              git push origin
 script:
   release: goreleaser release --snapshot --clean
   build: cd ./cli && go build -o ../aliax.exe .
