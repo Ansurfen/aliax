@@ -2,18 +2,20 @@ extend:
   aliax:
     flags:
       - name: init
-        alias: ["."]
+        alias: [".", init]
         type: bool
     match:
       - pattern: init
         platform: powershell
         run: |
           & $executable init
+          & $executable log -m "setting local environment" -f env="$PWD\run-scripts"
           $env:Path = "$PWD\run-scripts;" + $env:Path
       - pattern: init
         platform: bash
         run: |
           $executable init
+          $executable log -m "setting local environment" -f env="$PWD/run-scripts" -f env="$PWD/run-scripts/bash"
           exec bash -c "
             export PATH=\"$PWD/run-scripts:$PATH\"
             export PATH=\"$PWD/run-scripts/bash:$PATH\"
@@ -22,4 +24,5 @@ extend:
         platform: batch
         run: |
           %executable% init
+          %executable% log -m "setting local environment" -f env="$PWD\run-scripts"
           set PATH=%CD%\run-scripts;%PATH%

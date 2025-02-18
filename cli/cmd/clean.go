@@ -5,7 +5,7 @@ package cmd
 
 import (
 	"aliax/internal/cfg"
-	"aliax/internal/io"
+	"aliax/internal/aio"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -25,7 +25,7 @@ Additionally, it ensures that outdated extended commands are cleared.`,
 		Example: "  aliax clean",
 		Run: func(cmd *cobra.Command, args []string) {
 			var file cfg.Aliax
-			err := io.ReadYAML(config, &file)
+			err := aio.ReadYAML(config, &file)
 			if err != nil {
 				log.WithError(err).Fatalf("parsing %s", config)
 			}

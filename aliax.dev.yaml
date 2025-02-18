@@ -14,4 +14,25 @@ extend:
               git push origin
 script:
   release: goreleaser release --snapshot --clean
-  build: cd ./cli && go build -o ../aliax.exe .
+  build:
+    match:
+      - platform: windows
+        run: cd ./cli && go build -o ../aliax.exe .
+      - platform: posix
+        run: cd ./cli && go build -o ../aliax .
+  dev-deploy:
+    match:
+      - platform: windows
+        run: |
+          ./aliax.exe release
+          copy ./dist/{{.Output}} {{.DevDir}}/dev.zip
+          cd {{.DevDir}}
+          Expand-Archive -Path .\dev.zip -DestinationPath ./ -Force
+          ./aliax.exe clean
+          ./aliax.exe init -g
+          del dev.zip
+      - platform: posix
+        run: aliax release
+variable:
+  Output: '{{aliax_env "output"}}'
+  DevDir: '{{aliax_env "dev_dir"}}'

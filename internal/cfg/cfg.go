@@ -4,8 +4,10 @@
 package cfg
 
 import (
-	"aliax/internal/io"
+	"aliax/internal/aio"
 	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
 type Flag struct {
@@ -32,9 +34,10 @@ type Command struct {
 }
 
 type Aliax struct {
-	Extend  map[string]Command `yaml:"extend"`
-	Script  map[string]string  `yaml:"script"`
-	Command map[string]Command `yaml:"command"`
+	Variable map[string]string  `yaml:"variable"`
+	Extend   map[string]Command `yaml:"extend"`
+	Script   map[string]Script  `yaml:"script"`
+	Command  map[string]Command `yaml:"command"`
 }
 
 const work = "aliax.work"
@@ -45,7 +48,7 @@ func Name() string {
 	if len(target) > 0 {
 		return target
 	}
-	if ok, _ := io.Exist(work); ok {
+	if ok, _ := aio.Exist(work); ok {
 		data, err := os.ReadFile(work)
 		if err == nil {
 			target = string(data)
@@ -56,4 +59,27 @@ func Name() string {
 		target = "aliax.yaml"
 	}
 	return target
+}
+
+type Script struct {
+	Cmd *Command
+	Run *string
+}
+
+func (sc *Script) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		var run string
+		if err := value.Decode(&run); err != nil {
+			return err
+		}
+		sc.Run = &run
+		return nil
+	}
+
+	var cmd Command
+	if err := value.Decode(&cmd); err != nil {
+		return err
+	}
+	sc.Cmd = &cmd
+	return nil
 }
