@@ -13,7 +13,11 @@ import (
 )
 
 var envCmd = &cobra.Command{
-	Use: "env",
+	Use:     "env",
+	Short:   "Read and manage the ALIAXPATH environment variable",
+	Long:    `The 'env' command allows you to read and display the ALIAXPATH environment variable,
+which is a serialized JSON string. It provides key-value pairs that can be accessed and displayed in a human-readable format.`,
+	Example: `aliax env`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Info("reading ALIAXPATH from env")
 		path, err := getAliaxPath()

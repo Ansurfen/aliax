@@ -4,11 +4,13 @@
 package aos
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 
 	"github.com/caarlos0/log"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -35,4 +37,58 @@ func init() {
 			log.WithError(err).Fatal("fail to create log path")
 		}
 	}
+}
+
+func Create(name string) (*os.File, error) {
+	log.Debugf("creating %s", name)
+	return os.Create(name)
+}
+
+func Remove(name string) error {
+	log.Debugf("creating %s", name)
+	return os.Remove(name)
+}
+
+func Mkdir(path string, perm os.FileMode) error {
+	log.WithField("permission", perm.String()).Debugf("creating %s", path)
+	return os.Mkdir(path, perm)
+}
+
+func MkdirAll(path string, perm os.FileMode) error {
+	log.WithField("permission", perm.String()).Debugf("creating %s", path)
+	return os.MkdirAll(path, perm)
+}
+
+func ReadYAML(filename string, v any) error {
+	data, err := ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	log.Debug("parsing configure")
+	return yaml.Unmarshal(data, v)
+}
+
+func ReadJSON(filename string, v any) error {
+	data, err := ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	log.Debug("parsing configure")
+	return json.Unmarshal(data, v)
+}
+
+func ReadFile(name string) ([]byte, error) {
+	log.Debugf("reading %s", name)
+	return os.ReadFile(name)
+}
+
+func Exist(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return true, err
 }

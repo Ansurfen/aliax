@@ -68,3 +68,8 @@ func OnceScript(s string) error {
 
 	return nil
 }
+
+func LookPath(file string) (string, error) {
+	log.Debugf("looking path %s", file)
+	return exec.LookPath(file)
+}

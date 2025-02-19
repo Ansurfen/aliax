@@ -4,7 +4,7 @@
 package template
 
 import (
-	"aliax/internal/aio"
+	"aliax/internal/aos"
 	"html/template"
 	"io"
 	"os"
@@ -29,8 +29,7 @@ var aliaxFuncs = map[string]any{
 	"env": os.Getenv,
 	"aliax_env": func(key string) string {
 		if env == nil {
-			log.Info("parsing aliax.env.yaml")
-			err := aio.ReadYAML("aliax.env.yaml", &env)
+			err := aos.ReadYAML("aliax.env.yaml", &env)
 			if err != nil {
 				log.WithError(err).Fatal("fail to parse env")
 			}

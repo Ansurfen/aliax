@@ -4,8 +4,7 @@
 package cfg
 
 import (
-	"aliax/internal/aio"
-	"os"
+	"aliax/internal/aos"
 
 	"gopkg.in/yaml.v3"
 )
@@ -24,20 +23,20 @@ type Case struct {
 }
 
 type Command struct {
-	Short   string             `yaml:"short"`
-	Long    string             `yaml:"long"`
-	Example string             `yaml:"example"`
-	Flags   []Flag             `yaml:"flags"`
-	Match   []Case             `yaml:"match"`
-	Command map[string]Command `yaml:"command"`
-	Bin     string             `yaml:"bin"`
+	Short   string              `yaml:"short"`
+	Long    string              `yaml:"long"`
+	Example string              `yaml:"example"`
+	Flags   []Flag              `yaml:"flags"`
+	Match   []Case              `yaml:"match"`
+	Command map[string]*Command `yaml:"command"`
+	Bin     string              `yaml:"bin"`
 }
 
 type Aliax struct {
-	Variable map[string]string  `yaml:"variable"`
-	Extend   map[string]Command `yaml:"extend"`
-	Script   map[string]Script  `yaml:"script"`
-	Command  map[string]Command `yaml:"command"`
+	Variable map[string]string   `yaml:"variable"`
+	Extend   map[string]*Command `yaml:"extend"`
+	Script   map[string]Script   `yaml:"script"`
+	Command  map[string]*Command `yaml:"command"`
 }
 
 const work = "aliax.work"
@@ -48,8 +47,8 @@ func Name() string {
 	if len(target) > 0 {
 		return target
 	}
-	if ok, _ := aio.Exist(work); ok {
-		data, err := os.ReadFile(work)
+	if ok, _ := aos.Exist(work); ok {
+		data, err := aos.ReadFile(work)
 		if err == nil {
 			target = string(data)
 		} else {

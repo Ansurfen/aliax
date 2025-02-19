@@ -22,9 +22,10 @@ var (
 	logParameter logCmdParameter
 	logCmd       = &cobra.Command{
 		Use:     "log",
-		Short:   "",
-		Long:    "",
-		Example: "",
+		Short:   "Log a message with various log levels",
+		Long:    `The 'log' command allows you to log messages with different log levels like info, warn, error, fatal, and debug. 
+You can also add custom fields and control padding for the log output.`,
+		Example: `aliax log -l info -m "This is an info message" -f key1=value1 -f key2=value2`,
 		Run: func(cmd *cobra.Command, args []string) {
 			for k, v := range logParameter.fields {
 				if vv, err := strconv.Unquote(`"` + v + `"`); err != nil {
@@ -56,8 +57,8 @@ var (
 
 func init() {
 	aliaxCmd.AddCommand(logCmd)
-	logCmd.PersistentFlags().StringVarP(&logParameter.level, "level", "l", "info", "")
-	logCmd.PersistentFlags().StringVarP(&logParameter.msg, "message", "m", "", "")
-	logCmd.PersistentFlags().StringToStringVarP(&logParameter.fields, "field", "f", map[string]string{}, "")
-	logCmd.PersistentFlags().IntVarP(&logParameter.padding, "padding", "p", 0, "")
+	logCmd.PersistentFlags().StringVarP(&logParameter.level, "level", "l", "info", "Set the log level (info, warn, error, fatal, debug)")
+	logCmd.PersistentFlags().StringVarP(&logParameter.msg, "message", "m", "", "The log message")
+	logCmd.PersistentFlags().StringToStringVarP(&logParameter.fields, "field", "f", map[string]string{}, "Add custom fields to the log (key1=value1, key2=value2, ...)")
+	logCmd.PersistentFlags().IntVarP(&logParameter.padding, "padding", "p", 0, "Set the padding for log output")
 }

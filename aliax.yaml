@@ -8,13 +8,16 @@ extend:
       - pattern: init
         platform: powershell
         run: |
-          & $executable init
+          & $executable init $non_matched_args
+          if ($? -ne $true) {
+            exit 1
+          }
           & $executable log -m "setting local environment" -f env="$PWD\run-scripts"
           $env:Path = "$PWD\run-scripts;" + $env:Path
       - pattern: init
         platform: bash
         run: |
-          $executable init
+          $executable init "${non_matched_args[@]}"
           $executable log -m "setting local environment" -f env="$PWD/run-scripts" -f env="$PWD/run-scripts/bash"
           exec bash -c "
             export PATH=\"$PWD/run-scripts:$PATH\"
@@ -26,3 +29,5 @@ extend:
           %executable% init
           %executable% log -m "setting local environment" -f env="$PWD\run-scripts"
           set PATH=%CD%\run-scripts;%PATH%
+template:
+  

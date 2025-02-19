@@ -4,10 +4,9 @@
 package cmd
 
 import (
+	"aliax/internal/aos"
 	"aliax/internal/cfg"
-	"aliax/internal/aio"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -25,11 +24,11 @@ Additionally, it ensures that outdated extended commands are cleared.`,
 		Example: "  aliax clean",
 		Run: func(cmd *cobra.Command, args []string) {
 			var file cfg.Aliax
-			err := aio.ReadYAML(config, &file)
+			err := aos.ReadYAML(config, &file)
 			if err != nil {
-				log.WithError(err).Fatalf("parsing %s", config)
+				log.WithError(err).Fatalf("fail to parse file")
 			}
-			log.Infof("parsing %s", config)
+
 			bins := map[string]struct{}{}
 			for name := range file.Extend {
 				bins[name] = struct{}{}
@@ -40,40 +39,20 @@ Additionally, it ensures that outdated extended commands are cleared.`,
 				if err != nil {
 					return err
 				}
-				if strings.HasSuffix(filepath.Base(path), ".ps1") {
-					err = os.Remove(path)
+				if strings.HasSuffix(filepath.Base(path), ".ps1") ||
+					strings.HasSuffix(filepath.Base(path), ".sh") ||
+					filepath.Base(filepath.Dir(path)) == "bash" {
+					err = aos.Remove(path)
 					if err != nil {
-						log.WithError(err).Errorf("removing %s", path)
+						log.WithError(err).Errorf("fail to remove file")
 						return err
-					} else {
-						log.Infof("removing %s", path)
-					}
-				}
-
-				if strings.HasSuffix(filepath.Base(path), ".sh") {
-					err = os.Remove(path)
-					if err != nil {
-						log.WithError(err).Errorf("removing %s", path)
-						return err
-					} else {
-						log.Infof("removing %s", path)
-					}
-				}
-
-				if filepath.Base(filepath.Dir(path)) == "bash" {
-					err = os.Remove(path)
-					if err != nil {
-						log.WithError(err).Errorf("removing %s", path)
-						return err
-					} else {
-						log.Infof("removing %s", path)
 					}
 				}
 				return nil
 			})
 			log.DecreasePadding()
 			if err != nil {
-				log.WithError(err).Fatal("walk run-scripts")
+				log.WithError(err).Fatal("fail to walk run-scripts")
 			}
 			log.Info("thanks for using aliax!")
 		},

@@ -58,11 +58,20 @@ type BasicExpr struct {
 
 func (*BasicExpr) exprNode() {}
 
+var (
+	TRUE  = &BasicExpr{Kind: token.BOOL, Value: "true"}
+	FALSE = &BasicExpr{Kind: token.BOOL, Value: "false"}
+)
+
 type Ident struct {
 	Name string
 }
 
 func (*Ident) exprNode() {}
+
+func NewIdent(name string) *Ident {
+	return &Ident{Name: name}
+}
 
 type Stmt interface {
 	Node
@@ -76,6 +85,10 @@ type IfStmt struct {
 }
 
 func (*IfStmt) stmtNode() {}
+
+func NewIfStmt() *IfStmt {
+	return &IfStmt{Body: &BlockStmt{}}
+}
 
 type ForStmt struct {
 	Init Expr
@@ -92,6 +105,10 @@ type ExprStmt struct {
 
 func (*ExprStmt) stmtNode() {}
 
+func NewExprStmt(s string) *ExprStmt {
+	return &ExprStmt{X: &Ident{Name: s}}
+}
+
 type BlockStmt struct {
 	List []Stmt
 }
@@ -99,11 +116,16 @@ type BlockStmt struct {
 func (*BlockStmt) stmtNode() {}
 
 type SwitchStmt struct {
-	Cond  Expr
-	Cases []*CaseStmt
+	Cond    Expr
+	Cases   []*CaseStmt
+	Default *CaseStmt
 }
 
 func (*SwitchStmt) stmtNode() {}
+
+func (s *SwitchStmt) SetDefault(b *BlockStmt) {
+	s.Default = &CaseStmt{Body: b}
+}
 
 type CaseStmt struct {
 	Cond Expr
@@ -125,6 +147,17 @@ type CallStmt struct {
 }
 
 func (*CallStmt) stmtNode() {}
+
+func NewCallStmt(name string, args ...string) *CallStmt {
+	recv := []Expr{}
+	for _, a := range args {
+		recv = append(recv, &Ident{Name: a})
+	}
+	return &CallStmt{
+		Func: &Ident{Name: name},
+		Recv: recv,
+	}
+}
 
 type Comment struct {
 	Text string

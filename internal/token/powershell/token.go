@@ -9,7 +9,9 @@ const (
 	ADD Token = iota // +
 	SUB              // -
 
-	ASSIGN
+	ASSIGN // =
+
+	ADD_ASSIGN // +=
 
 	AND // &
 
@@ -29,5 +31,5 @@ const (
 )
 
 func (t Token) String() string {
-	return []string{"+", "-", "=", "&", "-eq", "-ne", "-lt", "-gt", "++", "--", ".."}[t]
+	return []string{"+", "-", "=", "+=", "&", "-eq", "-ne", "-lt", "-gt", "++", "--", ".."}[t]
 }

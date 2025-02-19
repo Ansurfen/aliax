@@ -54,11 +54,14 @@ func print(w io.Writer, node Node, space string) {
 			}
 			fmt.Fprintln(w, space+"    ;;")
 		}
+		if node.Default != nil {
+			fmt.Fprintln(w, space+"  *)")
+			for _, s := range node.Default.Body.List {
+				print(w, s, space+"    ")
+			}
+			fmt.Fprintln(w, space+"    ;;")
+		}
 		fmt.Fprintln(w, space+"esac")
-		// if node.Default != nil {
-		// 	fmt.Fprint(w, space+"  default")
-		// 	print(w, node.Default.Body, space+"  ")
-		// }
 	case *ExprStmt:
 		fmt.Fprintln(w, space+exprString(node.X))
 	case *AssignStmt:
