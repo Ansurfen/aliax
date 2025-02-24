@@ -54,7 +54,6 @@ Additionally, it ensures that outdated extended commands are cleared.`,
 			if err != nil {
 				log.WithError(err).Fatal("fail to walk run-scripts")
 			}
-			log.Info("thanks for using aliax!")
 		},
 	}
 )

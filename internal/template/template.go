@@ -13,6 +13,7 @@ import (
 )
 
 func Execute(w io.Writer, s string, data map[string]string) error {
+	log.Debugf("executing template")
 	tmpl, err := template.New("").Funcs(aliaxFuncs).Parse(s)
 	if err != nil {
 		return err

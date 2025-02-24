@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/caarlos0/log"
 	"gopkg.in/yaml.v3"
@@ -15,8 +16,11 @@ import (
 
 var (
 	// RootPath to where the executable is stored
-	RootPath string
-	LogPath  string
+	RootPath     string
+	LogPath      string
+	TemplatePath string
+
+	IsWindows = runtime.GOOS == "windows"
 )
 
 func init() {
@@ -27,14 +31,23 @@ func init() {
 
 	RootPath = filepath.Dir(path)
 	LogPath = filepath.Join(RootPath, "log")
+	TemplatePath = filepath.Join(RootPath, "template")
 
-	log.Debugf("creating %s", LogPath)
-	err = os.Mkdir(LogPath, 0755)
+	err = Mkdir(LogPath, 0755)
 	if err != nil {
 		if errors.Is(err, os.ErrExist) {
 			log.WithError(err).Debug("fail to create log path")
 		} else {
 			log.WithError(err).Fatal("fail to create log path")
+		}
+	}
+
+	err = Mkdir(TemplatePath, 0755)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			log.WithError(err).Debug("fail to create template path")
+		} else {
+			log.WithError(err).Fatal("fail to create template path")
 		}
 	}
 }
@@ -45,7 +58,7 @@ func Create(name string) (*os.File, error) {
 }
 
 func Remove(name string) error {
-	log.Debugf("creating %s", name)
+	log.Debugf("removing %s", name)
 	return os.Remove(name)
 }
 

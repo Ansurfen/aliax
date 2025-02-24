@@ -31,11 +31,10 @@ import (
 
 // initCmdParameter stores parameters for the "init" command.
 type initCmdParameter struct {
-	global  bool
-	force   bool
-	verbose bool
-
-	start time.Time
+	global   bool
+	force    bool
+	verbose  bool
+	template string
 }
 
 var (
@@ -48,9 +47,13 @@ It creates platform-specific scripts in the "run-scripts" directory for alias co
 If the --global (-g) flag is set, it applies configurations globally.`,
 		Example: "  aliax init\n  aliax init --global",
 		Run: func(cmd *cobra.Command, args []string) {
+			var start time.Time
 			if initParameter.verbose {
-				initParameter.start = time.Now()
+				start = time.Now()
 				log.SetLevel(log.DebugLevel)
+			}
+			if len(initParameter.template) > 0 {
+				config = filepath.Join(aos.TemplatePath, initParameter.template+".yaml")
 			}
 			var file cfg.Aliax
 			err := aos.ReadYAML(config, &file)
@@ -119,9 +122,8 @@ If the --global (-g) flag is set, it applies configurations globally.`,
 					log.Info("setting for the global")
 				}
 			}
-			log.Info("thanks for using aliax!")
 			if initParameter.verbose {
-				duration := time.Since(initParameter.start)
+				duration := time.Since(start)
 				log.Debugf("executing succeded after %s", style.Bold(duration.String()))
 			}
 		},
@@ -229,8 +231,9 @@ func parseCommands(cmds map[string]*cfg.Command) {
 func init() {
 	aliaxCmd.AddCommand(initCmd)
 	initCmd.PersistentFlags().BoolVarP(&initParameter.global, "global", "g", false, "Apply the initialization globally, affecting the entire system instead of the current project")
-	initCmd.PersistentFlags().BoolVarP(&initParameter.force, "force", "f", false, "")
-	initCmd.PersistentFlags().BoolVarP(&initParameter.verbose, "verbose", "v", false, "")
+	initCmd.PersistentFlags().BoolVarP(&initParameter.force, "force", "f", false, "Force the initialization, bypassing confirmation prompts")
+	initCmd.PersistentFlags().BoolVarP(&initParameter.verbose, "verbose", "v", false, "Enable verbose output")
+	initCmd.PersistentFlags().StringVarP(&initParameter.template, "template", "t", "", "Specify a template to use for initialization")
 }
 
 var (
@@ -496,6 +499,31 @@ func psBlockStmtBuild(subCommand []psast.Stmt, ident string, cmd *cfg.Command) (
 				},
 			}
 		}
+	} else {
+		for _, matchCase := range cmd.Match {
+			matchCase.Run = indexArguments.ReplaceAllStringFunc(matchCase.Run, func(s string) string {
+				matched := indexArguments.FindAllStringSubmatch(s, -1)
+				if len(matched) > 0 && len(matched[0]) > 1 {
+					i, _ := strconv.Atoi(matched[0][1])
+					i--
+					return fmt.Sprintf(`"$($args[%d])"`, i)
+				}
+				return s
+			})
+			matchCase.Run = envArguments.ReplaceAllStringFunc(matchCase.Run, func(s string) string {
+				matched := envArguments.FindAllStringSubmatch(s, -1)
+				if len(matched) > 0 && len(matched[0]) > 1 {
+					return fmt.Sprintf("$env:%s", matched[0][1])
+				}
+				return s
+			})
+			switch pattern := matchCase.Pattern.(type) {
+			case string:
+				if pattern == "_" || len(pattern) == 0 {
+					bs = append(bs, &psast.CallStmt{Func: &psast.Ident{matchCase.Run}}, &psast.CallStmt{Func: &psast.Ident{Name: "exit"}})
+				}
+			}
+		}
 	}
 	return bs
 }
@@ -710,6 +738,31 @@ func bashBlockStmtBuild(subCommand []bashast.Stmt, ident string, cmd *cfg.Comman
 				List: []bashast.Stmt{
 					bashast.NewExprStmt(defaultMatchCase.body),
 				},
+			}
+		}
+	} else {
+		for _, matchCase := range cmd.Match {
+			matchCase.Run = indexArguments.ReplaceAllStringFunc(matchCase.Run, func(s string) string {
+				matched := indexArguments.FindAllStringSubmatch(s, -1)
+				if len(matched) > 0 && len(matched[0]) > 1 {
+					i, _ := strconv.Atoi(matched[0][1])
+					i--
+					return fmt.Sprintf(`"$($args[%d])"`, i)
+				}
+				return s
+			})
+			matchCase.Run = envArguments.ReplaceAllStringFunc(matchCase.Run, func(s string) string {
+				matched := envArguments.FindAllStringSubmatch(s, -1)
+				if len(matched) > 0 && len(matched[0]) > 1 {
+					return fmt.Sprintf("$env:%s", matched[0][1])
+				}
+				return s
+			})
+			switch pattern := matchCase.Pattern.(type) {
+			case string:
+				if pattern == "_" || len(pattern) == 0 {
+					bs = append(bs, &bashast.CallStmt{Func: &bashast.Ident{Name: matchCase.Run}}, &bashast.CallStmt{Func: &bashast.Ident{Name: "exit"}})
+				}
 			}
 		}
 	}

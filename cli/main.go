@@ -11,115 +11,109 @@ import (
 	"aliax/internal/shell"
 	"aliax/internal/style"
 	"aliax/internal/template"
+	"aliax/internal/text"
+	"flag"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/caarlos0/log"
 	"github.com/google/shlex"
-	"github.com/spf13/cobra"
 )
 
-type customCmdParameter struct {
-	dry     bool
-	verbose bool
-}
+func executeCustomCmd() error {
+	sub_cmd := os.Args[1]
+	subCmd := map[string]struct{}{}
 
-var (
-	customParameter customCmdParameter
-	customCmd       = &cobra.Command{
-		Use:                "aliax <sub_cmd>",
-		Hidden:             true,
-		DisableSuggestions: true,
-		SilenceErrors:      true,
-		SilenceUsage:       true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			sub_cmd := args[0]
-			subCmd := map[string]struct{}{}
-
-			if customParameter.verbose {
-				log.SetLevel(log.DebugLevel)
-			}
-			for _, sub := range cmd.Root().Commands() {
-				subCmd[sub.Use] = struct{}{}
-			}
-			if _, ok := subCmd[sub_cmd]; !ok {
-				cfgName := cfg.Name()
-				var file cfg.Aliax
-				err := aos.ReadYAML(cfgName, &file)
-				if err != nil {
-					log.WithError(err).Fatalf("fail to parse file")
-				}
-				for name := range file.Script {
-					if _, ok := subCmd[name]; ok {
-						log.WithError(errors.ErrCmdConflict).
-							WithField("target", cfgName).
-							WithField("command", name).
-							WithField("suggestion", fmt.Sprintf(`please rename your custom command
+	if verbose {
+		log.SetLevel(log.DebugLevel)
+	}
+	for _, sub := range cmd.Root().Commands() {
+		subCmd[sub.Use] = struct{}{}
+	}
+	if _, ok := subCmd[sub_cmd]; !ok {
+		cfgName := cfg.Name()
+		var file cfg.Aliax
+		err := aos.ReadYAML(cfgName, &file)
+		if err != nil {
+			log.WithError(err).Fatalf("fail to parse file")
+		}
+		for name := range file.Script {
+			if _, ok := subCmd[name]; ok {
+				log.WithError(errors.ErrCmdConflict).
+					WithField("target", cfgName).
+					WithField("command", name).
+					WithField("suggestion", fmt.Sprintf(`please rename your custom command
 the following command names are not allowed. they are built-in commands for Aliax:
 %s`, style.Keyword("init、clean、env、log、version"))).Fatal("invalid script")
-					}
+			}
+		}
+		if script, ok := file.Script[sub_cmd]; ok {
+			log.Debugf("initializing variables")
+			log.IncreasePadding()
+			for k, v := range file.Variable {
+				buf := &strings.Builder{}
+				log.Debugf("initializing %s", k)
+				err = template.Execute(buf, v, nil)
+				if err != nil {
+					log.WithError(err).Fatal("fail to execute template")
 				}
-				if script, ok := file.Script[sub_cmd]; ok {
-					log.Debugf("initializing variables")
-					log.IncreasePadding()
-					for k, v := range file.Variable {
+				file.Variable[k] = buf.String()
+			}
+			log.DecreasePadding()
+			if script.Run != nil {
+				log.WithField("script", *script.Run).Infof("running command: %s", sub_cmd)
+				if err = executeCommand(*script.Run); err != nil {
+					log.WithError(err).Fatalf("running command: %s", *script.Run)
+				}
+			} else {
+				matches := (*script.Cmd).Match
+				// TODO map collect
+				for _, c := range matches {
+					if aos.IsWindows {
 						buf := &strings.Builder{}
-						log.Debugf("initializing %s", k)
-						err = template.Execute(buf, v, nil)
+						err = template.Execute(buf, c.Run, file.Variable)
 						if err != nil {
 							log.WithError(err).Fatal("fail to execute template")
 						}
-						file.Variable[k] = buf.String()
-					}
-					log.DecreasePadding()
-					if script.Run != nil {
-						log.WithField("script", *script.Run).Infof("running command: %s", sub_cmd)
-						if err = executeCommand(*script.Run); err != nil {
-							log.WithError(err).Fatalf("running command: %s", *script.Run)
+						if dry {
+							log.WithField("script", buf.String()).Info("dry mode")
+							return nil
 						}
+						log.WithField("script", buf.String()).Info("running command")
+						err = execute(buf.String())
+						if err != nil {
+							log.WithError(err).Fatal("fail to executing command")
+						}
+						return nil
 					} else {
-						matches := (*script.Cmd).Match
-						// TODO map collect
-						for _, c := range matches {
-							if runtime.GOOS == "windows" {
-								buf := &strings.Builder{}
-								err = template.Execute(buf, c.Run, file.Variable)
-								if err != nil {
-									log.WithError(err).Fatal("fail to execute template")
-								}
-								if customParameter.dry {
-									log.WithField("script", buf.String()).Info("dry mode")
-									return nil
-								}
-								log.WithField("script", buf.String()).Info("running command")
-								err = execute(buf.String())
-								if err != nil {
-									log.WithError(err).Fatal("fail to executing command")
-								}
-								return nil
-							} else {
-								fmt.Println(c.Run)
-								return nil
-							}
+						log.WithField("script", c.Run).Infof("running command: %s", sub_cmd)
+						if err = executeCommand(c.Run); err != nil {
+							log.WithError(err).Fatalf("running command: %s", c.Run)
 						}
+						return nil
 					}
-					return nil
 				}
 			}
-			return errors.ErrCmdNotFinish
-		},
+			return nil
+		}
 	}
+	return errors.ErrCmdNotFinish
+}
+
+var (
+	verbose bool
+	dry     bool
 )
 
 func init() {
-	customCmd.Flags().BoolVarP(&customParameter.dry, "dry", "d", false, "")
-	customCmd.Flags().BoolVarP(&customParameter.verbose, "verbose", "v", false, "")
+	flag.BoolVar(&verbose, "verbose", false, "")
+	flag.BoolVar(&verbose, "v", false, "")
+	flag.BoolVar(&dry, "dry", false, "")
+	flag.BoolVar(&dry, "d", false, "")
 }
 
 func main() {
@@ -132,14 +126,22 @@ func main() {
 
 	log.Log = log.New(io.MultiWriter(os.Stderr, logFile))
 
+	flag.Parse()
+
 	if len(os.Args) > 1 {
-		err := customCmd.Execute()
+		err := executeCustomCmd()
 		if err == nil {
 			return
 		}
 	}
-	fmt.Println(customParameter.verbose)
+
 	cmd.Execute()
+
+	if len(os.Args) > 1 {
+		if text.In(os.Args[1], []string{"clean", "init", "env"}) {
+			log.Info("thanks for using aliax!")
+		}
+	}
 }
 
 func execute(cmdStr string) error {
@@ -155,17 +157,9 @@ func executeCommand(cmdStr string) error {
 		return fmt.Errorf("error splitting command: %v", err)
 	}
 
-	isWindows := runtime.GOOS == "windows"
-
-	var cmdExec *exec.Cmd
-
 	cmds := strings.Join(parts, " ")
 
-	if isWindows {
-		cmdExec = exec.Command("cmd", "/C", cmds)
-	} else {
-		cmdExec = exec.Command("bash", "-c", cmds)
-	}
+	cmdExec := shell.StartCmd(cmds)
 
 	cmdExec.Stdout = os.Stdout
 	cmdExec.Stderr = os.Stderr

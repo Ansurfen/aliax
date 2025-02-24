@@ -4,14 +4,21 @@
 package shell
 
 import (
+	"aliax/internal/aos"
 	"aliax/internal/text"
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 
 	"github.com/caarlos0/log"
 )
+
+func StartCmd(name string, arg ...string) *exec.Cmd {
+	if aos.IsWindows {
+		return exec.Command("cmd", append([]string{"/C", name}, arg...)...)
+	}
+	return exec.Command("bash", append([]string{"-c", name}, arg...)...)
+}
 
 func Run(name string, arg ...string) error {
 	cmd := exec.Command(name, arg...)
@@ -36,14 +43,14 @@ func Run(name string, arg ...string) error {
 
 func OnceScript(s string) error {
 	suffix := ".sh"
-	if runtime.GOOS == "windows" {
+	if aos.IsWindows {
 		suffix = ".ps1"
 	}
 	tmpFile, err := os.CreateTemp(".", fmt.Sprintf("aliax_temp_*.%s", suffix))
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmpFile.Name())
+	defer aos.Remove(tmpFile.Name())
 
 	_, err = tmpFile.WriteString(s)
 	if err != nil {
@@ -53,7 +60,7 @@ func OnceScript(s string) error {
 	tmpFile.Close()
 
 	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
+	if aos.IsWindows {
 		cmd = exec.Command("powershell", tmpFile.Name())
 	} else {
 		cmd = exec.Command("bash", tmpFile.Name())

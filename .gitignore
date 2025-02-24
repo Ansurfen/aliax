@@ -30,6 +30,7 @@ run-scripts
 dist/
 
 log/
+template/
 
 aliax.env.yaml
 
