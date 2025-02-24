@@ -27,6 +27,7 @@ import (
 	"github.com/ansurfen/globalenv"
 	"github.com/caarlos0/log"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 // initCmdParameter stores parameters for the "init" command.
@@ -35,6 +36,7 @@ type initCmdParameter struct {
 	force    bool
 	verbose  bool
 	template string
+	save     bool
 }
 
 var (
@@ -59,6 +61,17 @@ If the --global (-g) flag is set, it applies configurations globally.`,
 			err := aos.ReadYAML(config, &file)
 			if err != nil {
 				log.WithError(err).Fatalf("fail to parse file")
+			}
+			if initParameter.save {
+				path := filepath.Join(aos.TemplatePath, filepath.Base(config))
+				output, err := aos.Create(path)
+				if err != nil {
+					log.WithError(err).Fatal("fail to create file")
+				}
+				err = yaml.NewEncoder(output).Encode(file)
+				if err != nil {
+					log.WithError(err).Fatal("backuping template")
+				}
 			}
 			err = aos.MkdirAll("run-scripts/bash", 0755)
 			if err != nil {
@@ -234,6 +247,7 @@ func init() {
 	initCmd.PersistentFlags().BoolVarP(&initParameter.force, "force", "f", false, "Force the initialization, bypassing confirmation prompts")
 	initCmd.PersistentFlags().BoolVarP(&initParameter.verbose, "verbose", "v", false, "Enable verbose output")
 	initCmd.PersistentFlags().StringVarP(&initParameter.template, "template", "t", "", "Specify a template to use for initialization")
+	initCmd.PersistentFlags().BoolVarP(&initParameter.save, "save", "s", false, "Backup the current executed YAML to the template directory")
 }
 
 var (
