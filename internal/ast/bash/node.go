@@ -3,13 +3,24 @@
 // license that can be found in the LICENSE file.
 package bashast
 
-import "aliax/internal/token/bash"
+import (
+	token "aliax/internal/token/bash"
+	"fmt"
+)
 
 type Node interface{}
 
 type Expr interface {
 	Node
 	exprNode()
+}
+
+func Raw(script string) Expr {
+	return &Ident{Name: script}
+}
+
+func RawStmt(s string) Stmt {
+	return &ExprStmt{X: &Ident{Name: s}}
 }
 
 type BinaryExpr struct {
@@ -19,6 +30,10 @@ type BinaryExpr struct {
 }
 
 func (*BinaryExpr) exprNode() {}
+
+func BinaryExpression(x Expr, op token.Token, y Expr) *BinaryExpr {
+	return &BinaryExpr{X: x, Op: op, Y: y}
+}
 
 type SelectorExpr struct {
 	X   Expr
@@ -44,6 +59,13 @@ type IncDecExpr struct {
 
 func (*IncDecExpr) exprNode() {}
 
+func IncDecExpression(x Expr, inc bool) *IncDecExpr {
+	if inc {
+		return &IncDecExpr{X: x, Op: token.Inc}
+	}
+	return &IncDecExpr{X: x, Op: token.Dec}
+}
+
 type IndexExpr struct {
 	X   Expr
 	Key Expr
@@ -58,6 +80,27 @@ type BasicExpr struct {
 
 func (*BasicExpr) exprNode() {}
 
+func Number(n int) *BasicExpr {
+	return &BasicExpr{
+		Kind:  token.NUMBER,
+		Value: fmt.Sprintf("%d", n),
+	}
+}
+
+func Bool(b bool) *BasicExpr {
+	return &BasicExpr{
+		Kind:  token.BOOL,
+		Value: fmt.Sprintf("%t", b),
+	}
+}
+
+func String(s string) *BasicExpr {
+	return &BasicExpr{
+		Kind:  token.STRING,
+		Value: s,
+	}
+}
+
 var (
 	TRUE  = &BasicExpr{Kind: token.BOOL, Value: "true"}
 	FALSE = &BasicExpr{Kind: token.BOOL, Value: "false"}
@@ -69,7 +112,7 @@ type Ident struct {
 
 func (*Ident) exprNode() {}
 
-func NewIdent(name string) *Ident {
+func Identifier(name string) *Ident {
 	return &Ident{Name: name}
 }
 
@@ -86,7 +129,7 @@ type IfStmt struct {
 
 func (*IfStmt) stmtNode() {}
 
-func NewIfStmt() *IfStmt {
+func IfStatement() *IfStmt {
 	return &IfStmt{Body: &BlockStmt{}}
 }
 
@@ -99,21 +142,34 @@ type ForStmt struct {
 
 func (*ForStmt) stmtNode() {}
 
+func ForStatement(init, cond, post Expr) *ForStmt {
+	return &ForStmt{
+		Init: init,
+		Cond: cond,
+		Post: post,
+		Body: &BlockStmt{},
+	}
+}
+
 type ExprStmt struct {
 	X Expr
 }
 
 func (*ExprStmt) stmtNode() {}
 
-func NewExprStmt(s string) *ExprStmt {
-	return &ExprStmt{X: &Ident{Name: s}}
-}
-
 type BlockStmt struct {
 	List []Stmt
 }
 
 func (*BlockStmt) stmtNode() {}
+
+func BlockStatement(stmts ...Stmt) *BlockStmt {
+	return &BlockStmt{List: stmts}
+}
+
+func (b *BlockStmt) Append(stmts ...Stmt) {
+	b.List = append(b.List, stmts...)
+}
 
 type SwitchStmt struct {
 	Cond    Expr
@@ -134,12 +190,26 @@ type CaseStmt struct {
 
 func (*CaseStmt) stmtNode() {}
 
+func CaseStatement(cond Expr) *CaseStmt {
+	return &CaseStmt{
+		Cond: cond,
+		Body: &BlockStmt{},
+	}
+}
+
 type AssignStmt struct {
 	Lhs Expr
 	Rhs Expr
 }
 
 func (*AssignStmt) stmtNode() {}
+
+func AssignStatement(lhs, rhs Expr) *AssignStmt {
+	return &AssignStmt{
+		Lhs: lhs,
+		Rhs: rhs,
+	}
+}
 
 type CallStmt struct {
 	Func Expr
@@ -148,7 +218,7 @@ type CallStmt struct {
 
 func (*CallStmt) stmtNode() {}
 
-func NewCallStmt(name string, args ...string) *CallStmt {
+func CallStatement(name string, args ...string) *CallStmt {
 	recv := []Expr{}
 	for _, a := range args {
 		recv = append(recv, &Ident{Name: a})

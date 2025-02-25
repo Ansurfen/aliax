@@ -12,6 +12,22 @@ extend:
               git add .
               docwiz commit -m "{{.message}}" -e
               git push origin
+command:
+  buildx:
+    short: buildx short desc
+    long: buildx long description
+    usage: builx [command]
+    command:
+      acp:
+        flags:
+          - name: message
+            short: 
+            alias: [-m, --message]
+            type: string
+        match:
+          - pattern: message
+            run: |
+              Write-Host "{{.message}}"
 script:
   release: goreleaser release --snapshot --clean
   build:

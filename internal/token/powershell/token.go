@@ -6,8 +6,9 @@ package token
 type Token int
 
 const (
-	ADD Token = iota // +
-	SUB              // -
+	None Token = iota
+	ADD        // +
+	SUB        // -
 
 	ASSIGN // =
 
@@ -31,5 +32,5 @@ const (
 )
 
 func (t Token) String() string {
-	return []string{"+", "-", "=", "+=", "&", "-eq", "-ne", "-lt", "-gt", "++", "--", ".."}[t]
+	return []string{"", "+", "-", "=", "+=", "&", "-eq", "-ne", "-lt", "-gt", "++", "--", ".."}[t]
 }
