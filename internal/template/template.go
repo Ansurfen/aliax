@@ -12,6 +12,8 @@ import (
 	"github.com/caarlos0/log"
 )
 
+// Execute processes a template string `s` with the provided `data` and writes the result to the `w` writer.
+// It uses the `aliaxFuncs` function map to add custom functions to the template.
 func Execute(w io.Writer, s string, data map[string]string) error {
 	log.Debugf("executing template")
 	tmpl, err := template.New("").Funcs(aliaxFuncs).Parse(s)

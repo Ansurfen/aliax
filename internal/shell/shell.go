@@ -13,6 +13,9 @@ import (
 	"github.com/caarlos0/log"
 )
 
+// StartCmd prepares a command for execution. It handles Windows and Unix-based OSes separately.
+// On Windows, it runs the command through `cmd` with `/C`.
+// On Unix-based OSes (Linux/macOS), it runs the command through `bash` with the `-c` option.
 func StartCmd(name string, arg ...string) *exec.Cmd {
 	if aos.IsWindows {
 		return exec.Command("cmd", append([]string{"/C", name}, arg...)...)
@@ -20,6 +23,8 @@ func StartCmd(name string, arg ...string) *exec.Cmd {
 	return exec.Command("bash", append([]string{"-c", name}, arg...)...)
 }
 
+// Run executes a command and captures its output (both stdout and stderr).
+// It then converts the output from GBK encoding to UTF-8 using `GBK2UTF8` function.
 func Run(name string, arg ...string) error {
 	cmd := exec.Command(name, arg...)
 	raw, err := cmd.CombinedOutput()
@@ -41,6 +46,8 @@ func Run(name string, arg ...string) error {
 	return nil
 }
 
+// OnceScript creates a temporary script file, writes the provided script content to it,
+// and then executes it once based on the operating system.
 func OnceScript(s string) error {
 	suffix := ".sh"
 	if aos.IsWindows {
@@ -76,6 +83,7 @@ func OnceScript(s string) error {
 	return nil
 }
 
+// LookPath searches for an executable file in the system's PATH and returns its full path.
 func LookPath(file string) (string, error) {
 	log.Debugf("looking path %s", file)
 	return exec.LookPath(file)
