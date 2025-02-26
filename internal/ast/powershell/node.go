@@ -25,6 +25,10 @@ type Comment struct {
 
 func (*Comment) stmtNode() {}
 
+func Docs(text string) *Comment {
+	return &Comment{Text: text}
+}
+
 type CallStmt struct {
 	CallOp token.Token
 	Func   Expr

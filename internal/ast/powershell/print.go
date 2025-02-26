@@ -4,7 +4,7 @@
 package psast
 
 import (
-	"aliax/internal/token/powershell"
+	token "aliax/internal/token/powershell"
 	"fmt"
 	"io"
 	"strings"
@@ -68,7 +68,7 @@ func print(w io.Writer, node Node, space string) {
 		for _, r := range node.Recv {
 			recv = append(recv, exprString(r))
 		}
-		if node.CallOp == token.AND {
+		if node.CallOp == token.BITAND {
 			fmt.Fprintf(w, space+"& %s %s\n", exprString(node.Func), strings.Join(recv, " "))
 		} else {
 			fmt.Fprintf(w, space+"%s %s\n", exprString(node.Func), strings.Join(recv, " "))

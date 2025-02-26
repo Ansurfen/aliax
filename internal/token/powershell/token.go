@@ -14,7 +14,9 @@ const (
 
 	ADD_ASSIGN // +=
 
-	AND // &
+	BITAND // &
+
+	AND // -and
 
 	EQ // ==
 	NE // !=
@@ -32,5 +34,5 @@ const (
 )
 
 func (t Token) String() string {
-	return []string{"", "+", "-", "=", "+=", "&", "-eq", "-ne", "-lt", "-gt", "++", "--", ".."}[t]
+	return []string{"", "+", "-", "=", "+=", "&", "-and", "-eq", "-ne", "-lt", "-gt", "++", "--", ".."}[t]
 }

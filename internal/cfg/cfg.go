@@ -5,6 +5,8 @@ package cfg
 
 import (
 	"aliax/internal/aos"
+	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -23,13 +25,83 @@ type Case struct {
 }
 
 type Command struct {
-	Short   string              `yaml:"short"`
-	Long    string              `yaml:"long"`
-	Example string              `yaml:"example"`
-	Flags   []Flag              `yaml:"flags"`
-	Match   []Case              `yaml:"match"`
-	Command map[string]*Command `yaml:"command"`
-	Bin     string              `yaml:"bin"`
+	DisableHelp bool                `yaml:"disableHelp"`
+	Short       string              `yaml:"short"`
+	Long        string              `yaml:"long"`
+	Example     string              `yaml:"example"`
+	Flags       []Flag              `yaml:"flags"`
+	Match       []Case              `yaml:"match"`
+	Command     map[string]*Command `yaml:"command"`
+	Bin         string              `yaml:"bin"`
+
+	name     string              `yaml:"-"`
+	flagDict map[string]flagType `yaml:"-"`
+}
+
+type flagType uint8
+
+const (
+	flagTypeString flagType = iota
+	flagTypeBool
+)
+
+func (c *Command) SetName(name string) {
+	c.name = name
+}
+
+func (c *Command) Name() string {
+	return c.name
+}
+
+func (c *Command) Preload(name string) error {
+	if !c.DisableHelp {
+		flags := map[string]struct{}{}
+		for _, flag := range c.Flags {
+			flags[flag.Name] = struct{}{}
+		}
+		if _, ok := flags["help"]; ok {
+			// add suggestion, e.g. try disable or instead of name
+			return fmt.Errorf("help flag ready exist")
+		}
+		c.Flags = append(c.Flags, Flag{
+			Name:  "help",
+			Alias: []string{"-h", "--help"},
+			Type:  "bool",
+			Usage: fmt.Sprintf("help for %s", name),
+		})
+	}
+	return nil
+}
+
+func (c *Command) HelpCmd(name string) string {
+	if c.DisableHelp {
+		return ""
+	}
+	cmds := []string{}
+	for cmdName, cmd := range c.Command {
+		cmds = append(cmds, fmt.Sprintf("  %s\t%s", cmdName, cmd.Short))
+	}
+	availableCommands := ""
+	if len(cmds) > 0 {
+		availableCommands = fmt.Sprintf("Available Commands:\n%s\n", strings.Join(cmds, "\n"))
+	}
+
+	flags := []string{}
+	for _, flag := range c.Flags {
+		flags = append(flags, fmt.Sprintf("  %s\t%s", flag.Name, flag.Usage))
+	}
+
+	availableflags := ""
+	if len(flags) > 0 {
+		availableflags = fmt.Sprintf("Flags:\n%s\n", strings.Join(flags, "\n"))
+	}
+	return fmt.Sprintf(`%s
+
+Usage:
+  %s [command]
+
+%s
+%s`, c.Long, name, availableCommands, availableflags)
 }
 
 type Aliax struct {

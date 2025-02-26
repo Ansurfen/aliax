@@ -4,7 +4,7 @@
 package psast
 
 import (
-	"aliax/internal/token/powershell"
+	token "aliax/internal/token/powershell"
 	"os"
 	"testing"
 )
@@ -109,7 +109,7 @@ func TestIf(t *testing.T) {
 
 func TestCall(t *testing.T) {
 	Print(&CallStmt{
-		CallOp: token.AND,
+		CallOp: token.BITAND,
 		Func:   &Ident{Name: "Write-Host"},
 		Recv: []Expr{
 			&Ident{Name: "$executable"},

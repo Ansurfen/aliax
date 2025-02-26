@@ -39,8 +39,8 @@ Additionally, it ensures that outdated extended commands are cleared.`,
 				if err != nil {
 					return err
 				}
-				if strings.HasSuffix(filepath.Base(path), ".ps1") ||
-					strings.HasSuffix(filepath.Base(path), ".sh") ||
+				if strings.HasSuffix(path, ".ps1") ||
+					strings.HasSuffix(path, ".sh") ||
 					filepath.Base(filepath.Dir(path)) == "bash" {
 					err = aos.Remove(path)
 					if err != nil {

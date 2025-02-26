@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// Print writes the string representation of the given AST node to the provided writer.
 func Print(node Node, w io.Writer) {
 	print(w, node, "")
 }
@@ -94,8 +95,9 @@ func exprString(expr Expr) string {
 			return expr.Value
 		}
 	case *BinaryExpr:
-		if expr.Op == token.EQ {
-			return fmt.Sprintf("%s == %s", exprString(expr.X), exprString(expr.Y))
+		switch expr.Op {
+		case token.EQ, token.AND:
+			return fmt.Sprintf("%s %s %s", exprString(expr.X), expr.Op, exprString(expr.Y))
 		}
 		return fmt.Sprintf("%s%s%s", exprString(expr.X), expr.Op, exprString(expr.Y))
 	case *IndexExpr:
