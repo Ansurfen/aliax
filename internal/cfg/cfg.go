@@ -34,16 +34,8 @@ type Command struct {
 	Command     map[string]*Command `yaml:"command"`
 	Bin         string              `yaml:"bin"`
 
-	name     string              `yaml:"-"`
-	flagDict map[string]flagType `yaml:"-"`
+	name string `yaml:"-"`
 }
-
-type flagType uint8
-
-const (
-	flagTypeString flagType = iota
-	flagTypeBool
-)
 
 func (c *Command) SetName(name string) {
 	c.name = name
@@ -77,6 +69,21 @@ func (c *Command) HelpCmd(name string) string {
 	if c.DisableHelp {
 		return ""
 	}
+	usage := ""
+	switch {
+	case len(c.Command) == 0 && len(c.Flags) > 0:
+		usage = fmt.Sprintf("Usage:\n  %s [flags]", c.name)
+	case len(c.Command) == 0 && len(c.Flags) == 0:
+		usage = fmt.Sprintf("Usage:\n  %s", c.name)
+	case len(c.Command) > 0 && len(c.Flags) > 0:
+		usage = fmt.Sprintf("Usage:\n  %s [command] [flags]", c.name)
+	}
+
+	example := ""
+	if len(c.Example) > 0 {
+		example = fmt.Sprintf("Example:\n%s", c.Example)
+	}
+
 	cmds := []string{}
 	for cmdName, cmd := range c.Command {
 		cmds = append(cmds, fmt.Sprintf("  %s\t%s", cmdName, cmd.Short))
@@ -88,27 +95,35 @@ func (c *Command) HelpCmd(name string) string {
 
 	flags := []string{}
 	for _, flag := range c.Flags {
-		flags = append(flags, fmt.Sprintf("  %s\t%s", flag.Name, flag.Usage))
+		flags = append(flags, fmt.Sprintf("  %s\t%s", strings.Join(flag.Alias, ", "), flag.Usage))
 	}
 
 	availableflags := ""
 	if len(flags) > 0 {
 		availableflags = fmt.Sprintf("Flags:\n%s\n", strings.Join(flags, "\n"))
 	}
-	return fmt.Sprintf(`%s
-
-Usage:
-  %s [command]
+	return strings.TrimSpace(fmt.Sprintf(`%s
 
 %s
-%s`, c.Long, name, availableCommands, availableflags)
+%s
+%s
+%s`, c.Long, usage, example, availableCommands, availableflags))
 }
 
 type Aliax struct {
-	Variable map[string]string   `yaml:"variable"`
-	Extend   map[string]*Command `yaml:"extend"`
-	Script   map[string]Script   `yaml:"script"`
-	Command  map[string]*Command `yaml:"command"`
+	Executable string              `yaml:"executable"`
+	RunPath    string              `yaml:"runPath"`
+	Variable   map[string]string   `yaml:"variable"`
+	Extend     map[string]*Command `yaml:"extend"`
+	Command    map[string]*Command `yaml:"command"`
+	Script     map[string]Script   `yaml:"script"`
+}
+
+// TODO
+type Commands map[string]*Command
+
+func (c *Commands) LoadBinPath() {
+
 }
 
 const work = "aliax.work"

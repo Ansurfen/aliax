@@ -29,7 +29,7 @@ run-scripts
 # Added by goreleaser init:
 dist/
 
-log/
+*.log
 template/
 
 aliax.env.yaml

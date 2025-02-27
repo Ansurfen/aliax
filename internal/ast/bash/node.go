@@ -16,6 +16,15 @@ type Node interface{}
 type Expr interface {
 	Node
 	exprNode()
+
+	String() string
+}
+
+// Stmt is the interface for all statement nodes in the AST.
+// Any type that implements `stmtNode()` is considered a statement node.
+type Stmt interface {
+	Node
+	stmtNode()
 }
 
 // Raw creates a raw expression from a string (like an identifier).
@@ -28,55 +37,109 @@ func RawStmt(s string) Stmt {
 	return &ExprStmt{X: &Ident{Name: s}}
 }
 
-// BinaryExpr represents a binary expression with a left operand (X), operator (Op), and right operand (Y).
-type BinaryExpr struct {
-	X  Expr
-	Op token.Token
-	Y  Expr
+type (
+	// BinaryExpr represents a binary expression with a left operand (X), operator (Op), and right operand (Y).
+	BinaryExpr struct {
+		X  Expr
+		Op token.Token
+		Y  Expr
+	}
+
+	// SelectorExpr represents an expression where one expression accesses a field or method of another.
+	SelectorExpr struct {
+		X   Expr
+		Sel Expr
+	}
+
+	// RefExpr represents a reference to an expression (e.g., variable reference).
+	RefExpr struct {
+		X Expr
+	}
+
+	// IncDecExpr represents an increment or decrement operation on an expression.
+	IncDecExpr struct {
+		X  Expr
+		Op token.Token
+	}
+
+	// IndexExpr represents an expression where an index is used to access an element (e.g., array or slice indexing).
+	IndexExpr struct {
+		X   Expr
+		Key Expr
+	}
+
+	// BasicExpr represents a basic expression with a type and a value.
+	BasicExpr struct {
+		Kind  token.Token
+		Value string
+	}
+
+	// Ident represents an identifier (like a variable or function name).
+	Ident struct {
+		Name string
+	}
+)
+
+func (*BinaryExpr) exprNode()   {}
+func (*SelectorExpr) exprNode() {}
+func (*RefExpr) exprNode()      {}
+func (*IncDecExpr) exprNode()   {}
+func (*IndexExpr) exprNode()    {}
+func (*BasicExpr) exprNode()    {}
+func (*Ident) exprNode()        {}
+
+func (e *BinaryExpr) String() string {
+	switch e.Op {
+	case token.EQ, token.AND:
+		return fmt.Sprintf("%s %s %s", e.X, e.Op, e.Y)
+	}
+	return fmt.Sprintf("%s%s%s", e.X, e.Op, e.Y)
 }
 
-func (*BinaryExpr) exprNode() {}
+func (e *SelectorExpr) String() string {
+	return fmt.Sprintf("%s.%s", e.X, e.Sel)
+}
+
+func (e *RefExpr) String() string {
+	if expr, ok := e.X.(*Ident); ok {
+		return fmt.Sprintf("$%s", expr)
+	}
+	return fmt.Sprintf("${%s}", e.X)
+}
+
+func (e *IncDecExpr) String() string {
+	return fmt.Sprintf("%s%s", e.X, e.Op)
+}
+
+func (e *IndexExpr) String() string {
+	return fmt.Sprintf("%s[%s]", e.X, e.Key)
+}
+
+func (e *BasicExpr) String() string {
+	switch e.Kind {
+	case token.STRING:
+		return fmt.Sprintf(`"%s"`, e.Value)
+	default:
+		return e.Value
+	}
+}
+
+func (e *Ident) String() string {
+	return e.Name
+}
 
 // BinaryExpression creates a new binary expression with the given operands and operator.
 func BinaryExpression(x Expr, op token.Token, y Expr) *BinaryExpr {
 	return &BinaryExpr{X: x, Op: op, Y: y}
 }
 
-// SelectorExpr represents an expression where one expression accesses a field or method of another.
-type SelectorExpr struct {
-	X   Expr
-	Sel Expr
-}
-
-func (*SelectorExpr) exprNode() {}
-
-// File represents a collection of statements (like a program or a script).
-type File struct {
-	Stmts []Stmt
-}
-
-// RefExpr represents a reference to an expression (e.g., variable reference).
-type RefExpr struct {
-	X Expr
-}
-
-func (*RefExpr) exprNode() {}
-
-func RefExpression(x Expr) *RefExpr {
-	return &RefExpr{X: x}
-}
-
 func RefRaw(name string) *RefExpr {
 	return &RefExpr{X: &Ident{Name: name}}
 }
 
-// IncDecExpr represents an increment or decrement operation on an expression.
-type IncDecExpr struct {
-	X  Expr
-	Op token.Token
+func RefExpression(x Expr) *RefExpr {
+	return &RefExpr{X: x}
 }
-
-func (*IncDecExpr) exprNode() {}
 
 // IncDecExpression creates an increment or decrement expression for the given operand.
 func IncDecExpression(x Expr, inc bool) *IncDecExpr {
@@ -85,22 +148,6 @@ func IncDecExpression(x Expr, inc bool) *IncDecExpr {
 	}
 	return &IncDecExpr{X: x, Op: token.Dec}
 }
-
-// IndexExpr represents an expression where an index is used to access an element (e.g., array or slice indexing).
-type IndexExpr struct {
-	X   Expr
-	Key Expr
-}
-
-func (*IndexExpr) exprNode() {}
-
-// BasicExpr represents a basic expression with a type and a value.
-type BasicExpr struct {
-	Kind  token.Token
-	Value string
-}
-
-func (*BasicExpr) exprNode() {}
 
 // Number creates a new basic expression representing a number.
 func Number(n int) *BasicExpr {
@@ -131,48 +178,76 @@ var (
 	FALSE = &BasicExpr{Kind: token.BOOL, Value: "false"}
 )
 
-// Ident represents an identifier (like a variable or function name).
-type Ident struct {
-	Name string
-}
-
-func (*Ident) exprNode() {}
-
 // Identifier creates a new identifier expression with the given name.
 func Identifier(name string) *Ident {
 	return &Ident{Name: name}
 }
 
-// Stmt is the interface for all statement nodes in the AST.
-// Any type that implements `stmtNode()` is considered a statement node.
-type Stmt interface {
-	Node
-	stmtNode()
-}
+type (
+	// IfStmt represents an `if` statement, which has a condition, a body, and an optional else branch.
+	IfStmt struct {
+		Cond Expr
+		Body *BlockStmt
+		Else Stmt
+	}
 
-// IfStmt represents an `if` statement, which has a condition, a body, and an optional else branch.
-type IfStmt struct {
-	Cond Expr
-	Body *BlockStmt
-	Else Stmt
-}
+	// ForStmt represents a `for` loop statement, with initialization, condition, post, and body.
+	ForStmt struct {
+		Init Expr
+		Cond Expr
+		Post Expr
+		Body *BlockStmt
+	}
 
-func (*IfStmt) stmtNode() {}
+	// ExprStmt represents a statement that contains a single expression.
+	ExprStmt struct {
+		X Expr
+	}
+
+	// BlockStmt represents a block of statements enclosed in braces `{ ... }`.
+	BlockStmt struct {
+		List []Stmt
+	}
+
+	// SwitchStmt represents a `switch` statement with cases and a default block.
+	SwitchStmt struct {
+		Cond    Expr
+		Cases   []*CaseStmt
+		Default *CaseStmt
+	}
+
+	// CaseStmt represents a `case` statement in a switch, with a condition and a body.
+	CaseStmt struct {
+		Cond Expr
+		Body *BlockStmt
+	}
+
+	// AssignStmt represents an assignment statement with a left-hand side (Lhs) and a right-hand side (Rhs).
+	AssignStmt struct {
+		Lhs Expr
+		Rhs Expr
+	}
+
+	// CallStmt represents a function call statement with a function name and arguments.
+	CallStmt struct {
+		Func Expr
+		Recv []Expr
+	}
+)
+
+func (*IfStmt) stmtNode()     {}
+func (*ForStmt) stmtNode()    {}
+func (*ExprStmt) stmtNode()   {}
+func (*BlockStmt) stmtNode()  {}
+func (*SwitchStmt) stmtNode() {}
+func (*CaseStmt) stmtNode()   {}
+func (*AssignStmt) stmtNode() {}
+func (*CallStmt) stmtNode()   {}
 
 // IfStatement creates a new if statement with an empty body.
 func IfStatement() *IfStmt {
 	return &IfStmt{Body: &BlockStmt{}}
 }
-
-// ForStmt represents a `for` loop statement, with initialization, condition, post, and body.
-type ForStmt struct {
-	Init Expr
-	Cond Expr
-	Post Expr
-	Body *BlockStmt
-}
-
-func (*ForStmt) stmtNode() {}
 
 // ForStatement creates a new `for` statement with the given initialization, condition, and post-expressions.
 func ForStatement(init, cond, post Expr) *ForStmt {
@@ -184,20 +259,6 @@ func ForStatement(init, cond, post Expr) *ForStmt {
 	}
 }
 
-// ExprStmt represents a statement that contains a single expression.
-type ExprStmt struct {
-	X Expr
-}
-
-func (*ExprStmt) stmtNode() {}
-
-// BlockStmt represents a block of statements enclosed in braces `{ ... }`.
-type BlockStmt struct {
-	List []Stmt
-}
-
-func (*BlockStmt) stmtNode() {}
-
 // BlockStatement creates a new block statement with the given list of statements.
 func BlockStatement(stmts ...Stmt) *BlockStmt {
 	return &BlockStmt{List: stmts}
@@ -208,27 +269,10 @@ func (b *BlockStmt) Append(stmts ...Stmt) {
 	b.List = append(b.List, stmts...)
 }
 
-// SwitchStmt represents a `switch` statement with cases and a default block.
-type SwitchStmt struct {
-	Cond    Expr
-	Cases   []*CaseStmt
-	Default *CaseStmt
-}
-
-func (*SwitchStmt) stmtNode() {}
-
 // SetDefault sets the default case for the switch statement.
 func (s *SwitchStmt) SetDefault(b *BlockStmt) {
 	s.Default = &CaseStmt{Body: b}
 }
-
-// CaseStmt represents a `case` statement in a switch, with a condition and a body.
-type CaseStmt struct {
-	Cond Expr
-	Body *BlockStmt
-}
-
-func (*CaseStmt) stmtNode() {}
 
 // CaseStatement creates a new case statement with the given condition.
 func CaseStatement(cond Expr) *CaseStmt {
@@ -238,14 +282,6 @@ func CaseStatement(cond Expr) *CaseStmt {
 	}
 }
 
-// AssignStmt represents an assignment statement with a left-hand side (Lhs) and a right-hand side (Rhs).
-type AssignStmt struct {
-	Lhs Expr
-	Rhs Expr
-}
-
-func (*AssignStmt) stmtNode() {}
-
 // AssignStatement creates a new assignment statement with the given left and right expressions.
 func AssignStatement(lhs, rhs Expr) *AssignStmt {
 	return &AssignStmt{
@@ -253,14 +289,6 @@ func AssignStatement(lhs, rhs Expr) *AssignStmt {
 		Rhs: rhs,
 	}
 }
-
-// CallStmt represents a function call statement with a function name and arguments.
-type CallStmt struct {
-	Func Expr
-	Recv []Expr
-}
-
-func (*CallStmt) stmtNode() {}
 
 // CallStatement creates a new function call statement with the given function name and arguments.
 func CallStatement(name string, args ...string) *CallStmt {
@@ -272,6 +300,15 @@ func CallStatement(name string, args ...string) *CallStmt {
 		Func: &Ident{Name: name},
 		Recv: recv,
 	}
+}
+
+// File represents a collection of statements (like a program or a script).
+type File struct {
+	Stmts []Stmt
+}
+
+func (f *File) Append(stmts ...Stmt) {
+	f.Stmts = append(f.Stmts, stmts...)
 }
 
 // Comment represents a comment in the code.
